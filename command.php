@@ -14,10 +14,13 @@ class WpCli_Command_ReplaceNgg
 {
 	const POST_BATCH_SIZE = 1000;   // load this many wp posts once
 
+	private $args;
+	private $assocArgs;
+
 	private $posts;                 // post buffer
 	private $reached_end = false;   // no more posts to fetch
 	private $posts_offset = 0;
-	private $shortcodes = [];       // assoc array of ngg picture paths and more
+	private $attachments = [];       // assoc array of attachments made off ngg pics
 
 
 	/**
@@ -31,6 +34,9 @@ class WpCli_Command_ReplaceNgg
 	 * default: 0
 	 * ---
 	 *
+	 * [--home-url=<value>]
+	 * : where to try to download images. if left, will try on local installation
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp custom replace-ngg --limit-posts=20
@@ -38,32 +44,47 @@ class WpCli_Command_ReplaceNgg
 	 * @when after_wp_load
 	 */
 	public function __invoke($args, $assocArgs) {
+		$this->args = $args;
+		$this->assocArgs = $assocArgs;
+
 		$shortcode = 'singlepic';
 
 		$postCounter = 0;
 
 		while ($post = $this->fetchPost($shortcode)) {
-			WP_CLI::log("Post " . $post->ID . '.');
-
 			// find all occurences of the shortcode
 			$matchRes = preg_match_all('/\[singlepic=(?P<picid>\d+).*\]/', $post->post_content, $matches);
 			if ($matchRes===false) {
 				WP_CLI::error('Error in regex.');
 			}
 
+			WP_CLI::log('Post ' . $post->ID . ': ' . $matchRes . ' shortcode matches.');
+
 			if ($matchRes) {
 				foreach ($matches['picid'] as $picId) {
 					//WP_CLI::log("\t" . 'Found singlepic shortcode ' . $picId . ' in post ' . $post->ID);
 
-					if (!array_key_exists($picId, $this->shortcodes)) {
-						$this->shortcodes[$picId] = $this->expandShortcode($shortcode, $picId);
+					if (!array_key_exists($picId, $this->attachments)) {
+						$data = $this->expandShortcode($shortcode, $picId);
+
+						$url = $this->getOriginalMediaUrl($data->path);
+						$r = media_sideload_image($url, $post->ID, null, 'id');
+
+						if ($r instanceof WP_Error) {
+							WP_CLI::warning('\tshortcode {$picId}; could not sideload image: ' . $r->get_error_message());
+						} else {
+							WP_CLI::log("\tshortcode {$picId}; attached: " . $r);
+						}
+
+						$this->attachments[$picId] = $r;
 					}
 
-					WP_CLI::log("\tShortcode {$picId}: " . $this->shortcodes[$picId]->path);
+					$mkp = wp_get_attachment_link($this->attachments[$picId]);
+					$post->post_content = preg_replace('/\[singlepic=' . $picId . '.*\]/', $mkp, $post->post_content);
 				}
-			}
 
-			WP_CLI::log('Post ' . $post->ID . ': ' . $matchRes . ' matches.');
+				wp_update_post($post);
+			}
 
 			++$postCounter;
 
@@ -146,8 +167,25 @@ class WpCli_Command_ReplaceNgg
 
 		return (object) [
 			'id' => $picId,
-			'path' => $galData->path . '/' . $picData->filename
+			'path' => $galData->path . '/' . $picData->filename,
 		];
+	}
+
+	/**
+	 * Returns the full URL to the media file, either locally or on some external "home url"
+	 * if such was supplied in config
+	 *
+	 * @param $path relative path of the media
+	 *
+	 * @return string
+	 */
+	private function getOriginalMediaUrl($path)
+	{
+		if (!$this->assocArgs['home-url']) {
+			return home_url($path);
+		} else {
+			return $this->assocArgs['home-url'] . '/' . $path;
+		}
 	}
 }
 
