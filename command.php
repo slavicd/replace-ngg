@@ -190,7 +190,9 @@ class WpCli_Command_ReplaceNgg
 				return $file['tmp_name'];
 			}
 		} else {
-			$file['tmp_name'] = get_home_path() . $path;
+			$tmpName = sys_get_temp_dir() . '/' . basename($path);
+			copy(get_home_path() . $path, $tmpName);
+			$file['tmp_name'] = $tmpName;
 		}
 
 		return media_handle_sideload($file, $postId);
@@ -201,3 +203,4 @@ class WpCli_Command_ReplaceNgg
 }
 
 WP_CLI::add_command('custom replace-ngg', WpCli_Command_ReplaceNgg::class);
+
