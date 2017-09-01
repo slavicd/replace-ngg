@@ -67,11 +67,11 @@ class WpCli_Command_ReplaceNgg
 					if (!array_key_exists($picId, $this->attachments)) {
 						$data = $this->expandShortcode($shortcode, $picId);
 
-						$url = $this->getOriginalMediaUrl($data->path);
-						$r = media_sideload_image($url, $post->ID, null, 'id');
+						$r = $this->loadMedia($data->path, $post->ID);
 
-						if ($r instanceof WP_Error) {
-							WP_CLI::warning('\tshortcode {$picId}; could not sideload image: ' . $r->get_error_message());
+						if (is_wp_error($r)) {
+							WP_CLI::warning("\tshortcode {$picId}; could not load image: " . $r->get_error_message());
+							continue;
 						} else {
 							WP_CLI::log("\tshortcode {$picId}; attached: " . $r);
 						}
@@ -172,22 +172,32 @@ class WpCli_Command_ReplaceNgg
 	}
 
 	/**
-	 * Returns the full URL to the media file, either locally or on some external "home url"
-	 * if such was supplied in config
+	 * (re)Attaches a media file to a post, returning the id of the attachment
 	 *
 	 * @param $path relative path of the media
+	 * @param int $postId
 	 *
 	 * @return string
 	 */
-	private function getOriginalMediaUrl($path)
+	private function loadMedia($path, $postId)
 	{
-		if (!$this->assocArgs['home-url']) {
-			return home_url($path);
+		$file = [];
+		$file['name'] = basename($path);
+
+		if ($this->assocArgs['home-url']) {
+			$file['tmp_name'] = download_url($this->assocArgs['home-url'] . '/' . $path);
+			if (is_wp_error($file['tmp_name'])) {
+				return $file['tmp_name'];
+			}
 		} else {
-			return $this->assocArgs['home-url'] . '/' . $path;
+			$file['tmp_name'] = get_home_path() . $path;
 		}
+
+		return media_handle_sideload($file, $postId);
+
+		//$url = $this->getMediaLocation($data->path);
+		//$r = media_sideload_image($url, $post->ID, null, 'id');
 	}
 }
 
 WP_CLI::add_command('custom replace-ngg', WpCli_Command_ReplaceNgg::class);
-
