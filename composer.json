@@ -1,5 +1,5 @@
 {
-  "name": "entropi/replace-ngg",
+  "name": "slavicd/replace-ngg",
   "description": "Replace Next Gen Gallery shortcode [singlepic] by WP native images",
   "type": "wp-cli-package",
   "license": "MIT",

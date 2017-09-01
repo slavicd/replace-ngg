@@ -79,7 +79,7 @@ class WpCli_Command_ReplaceNgg
 						$this->attachments[$picId] = $r;
 					}
 
-					$mkp = wp_get_attachment_link($this->attachments[$picId]);
+					$mkp = wp_get_attachment_link($this->attachments[$picId], 'large');
 					$post->post_content = preg_replace('/\[singlepic=' . $picId . '.*\]/', $mkp, $post->post_content);
 				}
 
