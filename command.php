@@ -20,7 +20,6 @@ class WpCli_Command_ReplaceNgg
 	private $posts;                 // post buffer
 	private $reached_end = false;   // no more posts to fetch
 	private $posts_offset = 0;
-	private $attachments = [];       // assoc array of attachments made off ngg pics
 
 
 	/**
@@ -64,22 +63,18 @@ class WpCli_Command_ReplaceNgg
 				foreach ($matches['picid'] as $picId) {
 					//WP_CLI::log("\t" . 'Found singlepic shortcode ' . $picId . ' in post ' . $post->ID);
 
-					if (!array_key_exists($picId, $this->attachments)) {
-						$data = $this->expandShortcode($shortcode, $picId);
+					$data = $this->expandShortcode($shortcode, $picId);
 
-						$r = $this->loadMedia($data->path, $post->ID);
+					$r = $this->loadMedia($data->path, $post->ID);
 
-						if (is_wp_error($r)) {
-							WP_CLI::warning("\tshortcode {$picId}; could not load image: " . $r->get_error_message());
-							continue;
-						} else {
-							WP_CLI::log("\tshortcode {$picId}; attached: " . $r);
-						}
-
-						$this->attachments[$picId] = $r;
+					if (is_wp_error($r)) {
+						WP_CLI::warning("\tshortcode {$picId}; could not load image: " . $r->get_error_message());
+						continue;
+					} else {
+						WP_CLI::log("\tshortcode {$picId}; attached: " . $r);
 					}
 
-					$mkp = wp_get_attachment_link($this->attachments[$picId], 'large');
+					$mkp = wp_get_attachment_link($r, 'large');
 					$post->post_content = preg_replace('/\[singlepic=' . $picId . '.*\]/', $mkp, $post->post_content);
 				}
 
@@ -203,4 +198,3 @@ class WpCli_Command_ReplaceNgg
 }
 
 WP_CLI::add_command('custom replace-ngg', WpCli_Command_ReplaceNgg::class);
-
