@@ -104,7 +104,6 @@ class WpCli_Command_ReplaceNgg
 			global $wpdb;
 
 			$limit = self::POST_BATCH_SIZE;
-			$this->posts_offset += $limit;
 
 			$this->posts = $wpdb->get_results(
 				"SELECT * FROM {$wpdb->prefix}posts WHERE post_type IN ('post', 'page')" .
@@ -114,6 +113,7 @@ class WpCli_Command_ReplaceNgg
 			);
 
 			WP_CLI::log('Fetched ' . sizeof($this->posts) . " posts with shortcodes.");
+			$this->posts_offset += $limit;
 		}
 
 		if (empty($this->posts)) {
